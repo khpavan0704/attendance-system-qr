@@ -1,0 +1,25 @@
+═══════════════════════════════════════════════════════════════
+  QUICK FIX: "Network Error" when registering
+═══════════════════════════════════════════════════════════════
+
+PROBLEM:
+Your MySQL server requires a password, but the backend is trying 
+to connect without one.
+
+SOLUTION:
+1. Find your MySQL password (or set one if you forgot it)
+
+2. Edit backend/start_backend.bat and add your password:
+   Change: set DB_PASS=
+   To:     set DB_PASS=your_mysql_password_here
+
+3. Run: backend\start_backend.bat
+
+4. Try registering again at http://localhost:3000
+
+═══════════════════════════════════════════════════════════════
+
+For detailed instructions, see SETUP_GUIDE.md
+
+═══════════════════════════════════════════════════════════════
+
