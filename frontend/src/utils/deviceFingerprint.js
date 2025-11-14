@@ -2,54 +2,56 @@
 // Generates a unique fingerprint based on browser/device characteristics
 
 export function generateDeviceFingerprint() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return 'nofp';
+  }
+
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   ctx.textBaseline = 'top';
   ctx.font = '14px "Arial"';
   ctx.fillText('Device fingerprint', 2, 2);
-  
+
+  const scr = window.screen || {};
+  const nav = window.navigator || {};
+
   const fingerprint = {
     // Screen properties
-    screenResolution: `${screen.width}x${screen.height}`,
-    screenColorDepth: screen.colorDepth,
-    
+    screenResolution: `${scr.width || 0}x${scr.height || 0}`,
+    screenColorDepth: scr.colorDepth || 0,
+
     // Browser properties
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    platform: navigator.platform,
-    cookieEnabled: navigator.cookieEnabled,
-    doNotTrack: navigator.doNotTrack || 'unknown',
-    
+    userAgent: nav.userAgent || '',
+    language: nav.language || '',
+    platform: nav.platform || '',
+    cookieEnabled: !!nav.cookieEnabled,
+    doNotTrack: nav.doNotTrack || 'unknown',
+
     // Canvas fingerprint (unique rendering characteristics)
     canvasFingerprint: canvas.toDataURL(),
-    
+
     // Timezone
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     timezoneOffset: new Date().getTimezoneOffset(),
-    
-    // Hardware concurrency
-    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-    
-    // Device memory (if available)
-    deviceMemory: navigator.deviceMemory || 'unknown',
+
+    // Hardware
+    hardwareConcurrency: nav.hardwareConcurrency || 'unknown',
+    deviceMemory: nav.deviceMemory || 'unknown',
   };
-  
-  // Create a hash of the fingerprint
+
   const fingerprintString = JSON.stringify(fingerprint);
-  
-  // Simple hash function (for better performance, you could use crypto.subtle in production)
+
   let hash = 0;
   for (let i = 0; i < fingerprintString.length; i++) {
     const char = fingerprintString.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    hash |= 0;
   }
-  
-  // Also include a timestamp component to make it more unique (but stable for same device)
-  const stableFingerprint = Math.abs(hash).toString(16) + '_' + 
-    fingerprint.screenResolution + '_' + 
-    fingerprint.platform.substring(0, 10);
-  
-  return stableFingerprint.substring(0, 64); // Limit length
-}
 
+  const stableFingerprint =
+    Math.abs(hash).toString(16) + '_' +
+    fingerprint.screenResolution + '_' +
+    (fingerprint.platform || '').substring(0, 10);
+
+  return stableFingerprint.substring(0, 64);
+}

@@ -15,6 +15,7 @@ export default function Dashboard({ user, setUser }) {
   const [classId, setClassId] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
+  const [showManualInfo, setShowManualInfo] = useState(true);
 
   const logout = () => {
     setUser(null);
@@ -92,7 +93,7 @@ export default function Dashboard({ user, setUser }) {
     }
   };
 
-  // Poll rotating token when a session is active
+  // Poll rotating token when a session is active (7 seconds window)
   useEffect(() => {
     if (!sessionId) return;
     let timer = null;
@@ -100,9 +101,9 @@ export default function Dashboard({ user, setUser }) {
       try {
         const r = await axios.get(`${API_BASE}/api/qr/${sessionId}/current`);
         setToken(r.data.token);
-        // refresh a bit faster than server window size
-        const ws = (r.data.window_seconds || 15);
-        timer = setTimeout(fetchToken, Math.max(3000, ws * 800));
+        // refresh faster than server window size (7 seconds) - refresh every 5 seconds
+        const ws = (r.data.window_seconds || 7);
+        timer = setTimeout(fetchToken, Math.max(3000, ws * 700)); // 70% of window time
       } catch (e) {
         // ignore transient errors, but log for debugging
         console.error('Error fetching token:', e);
@@ -143,17 +144,188 @@ export default function Dashboard({ user, setUser }) {
           {showQR && sessionId && token && (
             <div className="qr-display">
               <h3>Show this on Projector</h3>
+              <div style={{
+                backgroundColor: '#fff3cd',
+                border: '2px solid #ffc107',
+                borderRadius: '8px',
+                padding: '15px',
+                marginBottom: '20px',
+                textAlign: 'center'
+              }}>
+                <strong style={{color: '#856404', fontSize: '16px'}}>⚠️ SECURITY WARNING</strong>
+                <p style={{color: '#856404', marginTop: '10px', fontSize: '14px'}}>
+                  Do NOT share this QR code via video call, screenshot, or photo.<br/>
+                  Only students physically present in the classroom can scan this code.
+                </p>
+              </div>
               <div className="qr-code-container">
                 <QRCode value={token} size={256} />
               </div>
               <p className="qr-text" style={{fontFamily: 'monospace', wordBreak: 'break-all'}}>{token}</p>
               <p style={{fontSize: '12px', color: '#666', marginTop: '10px'}}>
-                Session ID: {sessionId} | Token refreshes every 15 seconds
+                Session ID: {sessionId} | Token refreshes every 7 seconds
               </p>
+              <p style={{fontSize: '11px', color: '#d32f2f', marginTop: '5px', fontWeight: 'bold'}}>
+                🔒 Security: GPS verification required. Remote scanning is blocked.
+              </p>
+              <div style={{display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '15px'}}>
+                <button
+                  onClick={() => {
+                    if (navigator.clipboard?.writeText) {
+                      navigator.clipboard.writeText(token)
+                        .then(() => alert('Token copied to clipboard. Share only with students in class.'))
+                        .catch(() => alert('Unable to copy token. Please copy manually.'));
+                    } else {
+                      alert('Copy not supported on this browser. Please copy manually.');
+                    }
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    backgroundColor: '#4CAF50',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Copy Token
+                </button>
+                <button
+                  onClick={() => setShowManualInfo(prev => !prev)}
+                  style={{
+                    padding: '10px 18px',
+                    backgroundColor: '#2196F3',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {showManualInfo ? 'Hide' : 'Show'} Manual Entry Info
+                </button>
+              </div>
+              {showManualInfo && (
+                <div style={{
+                  marginTop: '20px',
+                  backgroundColor: '#eef9ff',
+                  border: '1px solid #90caf9',
+                  borderRadius: '8px',
+                  padding: '15px',
+                  color: '#0d47a1',
+                  textAlign: 'left'
+                }}>
+                  <h4 style={{marginTop: 0}}>Manual Token Entry Instructions</h4>
+                  <ul style={{paddingLeft: '18px', marginBottom: 0}}>
+                    <li>Tell students they can tap <strong>⌨️ Enter Token</strong> on their phones if the camera is not working.</li>
+                    <li>Read or display the token above so students can type it exactly (including dashes).</li>
+                    <li>Manual entry still requires GPS/location verification, so only students in the classroom will succeed.</li>
+                    <li>Tokens refresh every few seconds—if someone gets an error, ask them to enter the newest token.</li>
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           {showQR && sessionId && !token && (
             <div style={{padding: '20px', color: '#666'}}>Loading QR token...</div>
+          )}
+        </div>
+      );
+    }
+
+    if (activeView === 'manual' && user.role === 'teacher') {
+      return (
+        <div className="feature-content">
+          <h2>Manual Token Entry (Teacher Guide)</h2>
+          {!showQR || !sessionId ? (
+            <div style={{
+              backgroundColor: '#fff3cd',
+              border: '1px solid #ffc107',
+              borderRadius: '8px',
+              padding: '15px',
+              marginBottom: '20px',
+              color: '#856404'
+            }}>
+              <strong>Generate a QR (and token) first.</strong> The manual entry method uses the same rotating token. 
+              Click <strong>GENERATE QR</strong> above, start a session, then return here to share the token with students.
+            </div>
+          ) : null}
+
+          {showQR && sessionId && token && (
+            <div style={{
+              backgroundColor: '#eef9ff',
+              border: '1px solid #90caf9',
+              borderRadius: '8px',
+              padding: '18px',
+              marginBottom: '20px',
+              color: '#0d47a1'
+            }}>
+              <h3 style={{marginTop: 0}}>Current Token</h3>
+              <p style={{fontFamily: 'monospace', fontSize: '18px', wordBreak: 'break-all'}}>{token}</p>
+              <p style={{fontSize: '12px', color: '#0d47a1'}}>Session ID: {sessionId} | Refreshes every 7 seconds</p>
+              <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
+                <button
+                  onClick={() => {
+                    if (navigator.clipboard?.writeText) {
+                      navigator.clipboard.writeText(token)
+                        .then(() => alert('Token copied. Share only with students in class (manual entry still requires GPS).'))
+                        .catch(() => alert('Unable to copy. Please copy manually.'));
+                    } else {
+                      alert('Copy not supported on this browser. Copy manually instead.');
+                    }
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    backgroundColor: '#4CAF50',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Copy Token
+                </button>
+                <button
+                  onClick={() => setShowManualInfo(prev => !prev)}
+                  style={{
+                    padding: '10px 18px',
+                    backgroundColor: '#2196F3',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {showManualInfo ? 'Hide' : 'Show'} Student Instructions
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showManualInfo && (
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              padding: '18px',
+              lineHeight: 1.6
+            }}>
+              <h3 style={{marginTop: 0}}>How to Use Manual Entry</h3>
+              <ol style={{paddingLeft: '18px'}}>
+                <li>Show the QR on the projector <strong>and</strong> read out the token text beneath it.</li>
+                <li>Tell students with camera issues to tap <strong>⌨️ Enter Token</strong> on their phones.</li>
+                <li>They must type the token exactly (including dashes) before it refreshes.</li>
+                <li>Manual entry still enforces GPS/device/IP restrictions, so only students in your classroom will succeed.</li>
+                <li>If a student gets an “invalid/expired token” error, read the newest token on screen.</li>
+              </ol>
+              <p style={{marginTop: '10px', color: '#555'}}>
+                <strong>Need to run without QR?</strong> You can keep this page open and read out the new token every time it changes. 
+                Students can keep using manual entry without needing the camera.
+              </p>
+            </div>
           )}
         </div>
       );
@@ -245,12 +417,18 @@ export default function Dashboard({ user, setUser }) {
               </button>
               <button 
                 className="dashboard-btn btn-2" 
+                onClick={() => setActiveView('manual')}
+              >
+                MANUAL ENTRY
+              </button>
+              <button 
+                className="dashboard-btn btn-3" 
                 onClick={() => setActiveView('report')}
               >
                 VIEW REPORTS
               </button>
               <button 
-                className="dashboard-btn btn-3" 
+                className="dashboard-btn btn-4" 
                 onClick={() => setActiveView('dashboard')}
               >
                 DASHBOARD
